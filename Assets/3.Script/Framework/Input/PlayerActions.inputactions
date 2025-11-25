@@ -108,7 +108,7 @@
                 {
                     "name": "left",
                     "id": "a283dfd8-0e48-4147-9e6f-1ff780f8a012",
-                    "path": "<Keyboard>/leftAlt",
+                    "path": "<Keyboard>/leftArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
