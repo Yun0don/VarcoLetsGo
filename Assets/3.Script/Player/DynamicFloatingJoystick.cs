@@ -7,65 +7,94 @@ public class DynamicFloatingJoystick : MonoBehaviour,
     IPointerDownHandler, IPointerUpHandler, IDragHandler
 {
     [Header("Refs")]
-    [SerializeField] RectTransform baseRect;    // 바닥 원 (투명/반투명)
-    [SerializeField] RectTransform handleRect;  // 손잡이
+    [SerializeField] RectTransform baseRect;    // 바닥 원 (Base)
+    [SerializeField] RectTransform handleRect;  // 손잡이 (Handle)
     [SerializeField] float radius = 100f;       // 손잡이가 이동할 최대 반경 (px)
 
     public Vector2 Direction { get; private set; } // -1~1 범위의 방향
 
     Canvas canvas;
-    Camera uiCam;
+    RectTransform containerRect; // JoystickArea
 
     void Awake()
     {
         canvas = GetComponentInParent<Canvas>();
-        uiCam = canvas.worldCamera;
+        containerRect = transform as RectTransform;
 
+        // 시작은 숨김 상태
         Hide();
     }
 
-    public void OnPointerDown(PointerEventData eventData)
+    // ------------ Public API ------------
+
+    /// 터치 위치에 조이스틱을 띄운다.
+    public void Show(PointerEventData eventData)
     {
-        // 터치한 지점에 베이스 위치 시키기 (캔버스 기준 좌표로 변환)
-        RectTransform canvasRect = canvas.transform as RectTransform;
+        baseRect.gameObject.SetActive(true);
+        handleRect.gameObject.SetActive(true);
 
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvasRect, eventData.position, uiCam, out Vector2 localPos))
+                containerRect,
+                eventData.position,
+                GetEventCamera(eventData),
+                out Vector2 localPos))
         {
             baseRect.anchoredPosition = localPos;
         }
 
-        baseRect.gameObject.SetActive(true);
         handleRect.anchoredPosition = Vector2.zero;
         Direction = Vector2.zero;
     }
 
+    /// 조이스틱을 숨기고 상태를 초기화한다.
+    public void Hide()
+    {
+        baseRect.gameObject.SetActive(false);
+        handleRect.gameObject.SetActive(false);
+        handleRect.anchoredPosition = Vector2.zero;
+        Direction = Vector2.zero;
+    }
+
+    // ------------ EventSystem Callbacks ------------
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        // JoystickArea는 항상 켜져 있으므로 언제든지 다운 이벤트를 받는다.
+        Show(eventData);
+        OnDrag(eventData); // 살짝 움직인 느낌 주고 싶으면 유지
+    }
+
     public void OnDrag(PointerEventData eventData)
     {
-        // 베이스 기준 로컬 좌표로 변환
+        if (!baseRect.gameObject.activeSelf)
+            return;
+
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            baseRect, eventData.position, uiCam, out Vector2 localPos))
+                baseRect,
+                eventData.position,
+                GetEventCamera(eventData),
+                out Vector2 localPos))
         {
-            // 반경 제한
             if (localPos.magnitude > radius)
                 localPos = localPos.normalized * radius;
 
             handleRect.anchoredPosition = localPos;
-
-            // -1 ~ 1 구간으로 정규화된 입력 벡터
-            Direction = localPos / radius;
+            Direction = localPos / radius;  // -1~1
         }
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        Direction = Vector2.zero;
         Hide();
     }
 
-    void Hide()
+    // ------------ Helper ------------
+
+    Camera GetEventCamera(PointerEventData eventData)
     {
-        baseRect.gameObject.SetActive(false);
-        handleRect.anchoredPosition = Vector2.zero;
+        if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            return null;
+
+        return eventData.pressEventCamera ?? canvas.worldCamera;
     }
 }
